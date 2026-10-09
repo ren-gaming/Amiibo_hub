@@ -528,12 +528,9 @@
         // It can be either the archived AmiiboAPI data file or a file saved with the
         // "Save Amiibo List" button; the format is detected automatically. It is quick and always there.
         const AMIIBO_SOURCES = [
-            { url: './amiibo-data.json', kind: 'repo', label: 'amiibo-data.json (local database)', local: true },
             { url: 'https://amiiboapi.org/api/amiibo/', kind: 'api' },
             { url: 'https://www.amiiboapi.org/api/amiibo/', kind: 'api' },
-            { url: 'https://amiiboapi.com/api/amiibo/', kind: 'api' },
-            { url: 'https://cdn.jsdelivr.net/gh/N3evin/AmiiboAPI@master/database/amiibo.json', kind: 'repo' },
-            { url: 'https://raw.githubusercontent.com/N3evin/AmiiboAPI/master/database/amiibo.json', kind: 'repo' }
+            { url: './amiibo-data.json', kind: 'repo', label: 'amiibo-data.json (local database)', local: true },
         ];
         const DB_CACHE_KEY = 'pixlHub.amiiboDb.v1';
 
