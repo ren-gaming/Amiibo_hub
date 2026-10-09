@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixl.js Amiibo Manager & Scanner</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1f2937; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Navigation Header -->
+    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid me-0 fa-wifi text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">Pixl.js Amiibo Hub</h1>
+                    <p class="text-xs text-slate-400">Web Bluetooth Storage Scanner & Tracker</p>
+                </div>
+            </div>
+
+            <!-- Connection Status & Button -->
+            <div class="flex items-center space-x-3 w-full sm:w-auto justify-end">
+                <div id="statusBadge" class="px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-700 text-slate-300 border border-slate-600 flex items-center gap-2">
+                    <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                    <span id="statusText">Disconnected</span>
+                </div>
+                <button id="connectBtn" class="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all flex items-center gap-2 shadow-md shadow-indigo-600/20 active:scale-95">
+                    <i class="fa-bluetooth-b fab"></i>
+                    <span>Connect Pixl.js</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Application Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+
+        <!-- Unsupported browser notice -->
+        <div id="browserWarning" class="hidden bg-amber-900/30 border border-amber-700/60 text-amber-200 rounded-xl px-4 py-3 items-start gap-3">
+            <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+            <div>
+                <p class="text-sm font-semibold">This browser can't connect to a Pixl.js</p>
+                <p id="browserWarningText" class="text-xs text-amber-200/80 mt-1"></p>
+            </div>
+        </div>
+
+        <!-- Top Controls & Progress Bar -->
+        <section class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-5">
+
+                <!-- Stat Cards -->
+                <div class="bg-slate-900/60 border border-slate-700/60 rounded-xl p-4 flex items-center space-x-4">
+                    <div class="p-3 bg-blue-500/10 rounded-lg text-blue-400">
+                        <i class="fa-solid fa-layer-group text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-slate-400">Total Amiibo Database</p>
+                        <h3 id="totalAmiiboCount" class="text-xl font-bold text-slate-100">Loading...</h3>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/60 border border-slate-700/60 rounded-xl p-4 flex items-center space-x-4">
+                    <div class="p-3 bg-emerald-500/10 rounded-lg text-emerald-400">
+                        <i class="fa-solid fa-circle-check text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-slate-400">Loaded on Pixl.js</p>
+                        <h3 id="scannedCount" class="text-xl font-bold text-emerald-400">0</h3>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/60 border border-slate-700/60 rounded-xl p-4 flex items-center space-x-4">
+                    <div class="p-3 bg-amber-500/10 rounded-lg text-amber-400">
+                        <i class="fa-solid fa-circle-xmark text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-slate-400">Missing Amiibo</p>
+                        <h3 id="missingCount" class="text-xl font-bold text-amber-400">0</h3>
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <div class="flex items-center">
+                    <button id="scanBtn" disabled class="w-full h-full min-h-[52px] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center space-x-2 text-sm sm:text-base active:scale-95">
+                        <i class="fa-solid fa-magnifying-glass font-bold"></i>
+                        <span>Scan Pixl.js Device</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Collection Completion Progress -->
+            <div>
+                <div class="flex justify-between items-center text-xs text-slate-400 mb-1">
+                    <span>Pixl.js Amiibo Collection Completion</span>
+                    <span id="progressPercent" class="font-bold text-indigo-400">0%</span>
+                </div>
+                <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-slate-700">
+                    <div id="progressBar" class="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 h-full w-0 transition-all duration-500"></div>
+                </div>
+                <p id="lastScanInfo" class="hidden text-[11px] text-slate-500 mt-2"></p>
+            </div>
+        </section>
+
+        <!-- Filter Toolbar -->
+        <section class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col md:flex-row gap-4 justify-between items-center">
+
+            <!-- Search Bar -->
+            <div class="relative w-full md:w-80">
+                <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input type="text" id="searchInput" placeholder="Search by name, series, or ID..." class="w-full bg-slate-900 border border-slate-700 text-sm text-slate-200 pl-9 pr-4 py-2 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors placeholder-slate-500">
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                <!-- Status Filter -->
+                <select id="statusFilter" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500">
+                    <option value="all">All Amiibo</option>
+                    <option value="loaded">Loaded Only</option>
+                    <option value="missing">Missing Only</option>
+                </select>
+
+                <!-- Series Filter -->
+                <select id="seriesFilter" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500 max-w-[200px]">
+                    <option value="all">All Game Series</option>
+                </select>
+
+                <!-- Export missing list -->
+                <div class="relative">
+                    <button id="exportBtn" class="px-3 py-2 border border-slate-600 bg-slate-700 hover:bg-slate-600 text-xs font-medium text-slate-200 rounded-lg transition-colors flex items-center gap-1.5" title="Export the list of Amiibo you are missing">
+                        <i class="fa-solid fa-file-export text-amber-400"></i>
+                        <span>Export Missing</span>
+                    </button>
+                    <div id="exportMenu" class="hidden absolute mt-2 w-44 bg-slate-900 border border-slate-600 rounded-lg shadow-xl z-30 overflow-hidden">
+                        <button id="exportCopyBtn" class="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Copy as text</button>
+                        <button id="exportCsvBtn" class="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Download CSV</button>
+                    </div>
+                </div>
+
+                <!-- Reload Amiibo list -->
+                <button id="reloadDbBtn" class="px-3 py-2 border border-slate-600 bg-slate-700 hover:bg-slate-600 text-xs font-medium text-slate-200 rounded-lg transition-colors flex items-center gap-1.5" title="Reload the Amiibo list from the online database">
+                    <i class="fa-solid fa-rotate text-sky-400"></i>
+                    <span>Reload List</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Amiibo Grid Display -->
+        <section class="flex-1">
+            <div id="amiiboGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                <!-- Initial Loading state or cards will be injected here -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden flex-col items-center justify-center py-16 text-center text-slate-400">
+                <i class="fa-solid fa-ghost text-5xl mb-3 text-slate-600"></i>
+                <p id="emptyTitle" class="text-base font-semibold">No Amiibo match your search query.</p>
+                <p id="emptyHint" class="text-xs text-slate-500 mt-1">Try resetting filters or searching for another character.</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast message -->
+    <div id="toast" class="hidden fixed left-1/2 -translate-x-1/2 bottom-44 z-50 max-w-[90vw] bg-slate-100 text-slate-900 text-xs font-medium px-4 py-2 rounded-lg shadow-xl text-center"></div>
+
+    <!-- Log Drawer / Terminal Footer -->
+    <div class="bg-slate-950 border-t border-slate-800 py-2 px-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center space-x-2 text-xs text-slate-400">
+                    <i class="fa-solid fa-terminal text-indigo-400"></i>
+                    <span class="font-mono text-[11px]">Web Bluetooth supported: <b id="btSupport" class="text-emerald-400">Checking...</b></span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span id="appVersion" class="text-[11px] text-slate-600"></span>
+                    <button id="saveListBtn" class="text-[11px] text-slate-500 hover:text-slate-300" title="Save the loaded Amiibo list as amiibo-data.json">Save Amiibo List</button>
+                    <button id="reportBtn" class="text-[11px] text-amber-400 hover:text-amber-300 font-semibold">Report a Problem</button>
+                    <button id="copyLogsBtn" class="text-[11px] text-slate-500 hover:text-slate-300">Copy Log</button>
+                    <button id="clearLogsBtn" class="text-[11px] text-slate-500 hover:text-slate-300">Clear Logs</button>
+                </div>
+            </div>
+            <pre id="logConsole" class="font-mono text-[11px] text-slate-400 h-28 overflow-y-auto whitespace-pre-wrap custom-scrollbar">System initialized.</pre>
+        </div>
+    </div>
+
+    <script>
+        /*
+         * Pixl.js Amiibo Manager Application Core
+         * Communicates with Espruino Pixl.js device via Nordic UART Service (NUS)
+         */
+
+        // Bluetooth UUIDs for Espruino / Pixl.js UART
+        const NORDIC_UART_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+        const NORDIC_UART_TX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // Web -> Pixl.js (Write)
+        const NORDIC_UART_RX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // Pixl.js -> Web (Notify)
+
+        // App State Variables
+        let bluetoothDevice = null;
+        let gattServer = null;
+        let txCharacteristic = null; // Web -> Device (writes, 6e400002)
+        let rxCharacteristic = null; // Device -> Web (notifications, 6e400003)
+        // How long to wait for the device. The folder timeouts count silence between packets,
+        // not total time, so a big folder that keeps streaming is never cut off.
+        const REQUEST_TIMEOUT_MS = 8000;
+        const FOLDER_RETRY_TIMEOUT_MS = 15000;
+        const FOLDER_RETRY_PAUSE_MS = 3000;
+        let pending = null;                 // the one in-flight protocol request
+        let requestQueue = Promise.resolve(); // serialises requests
+        let isConnected = false;
+        let scanTimeout = null;
+        let isScanning = false;
+
+        let amiiboDatabase = [];
+        let loadedAmiiboIds = new Set();
+        let loadedFilenames = [];
+
+        const APP_VERSION = '1.4.1';
+        // Put your GitHub repository address here (for example
+        // 'https://github.com/yourname/pixljs-amiibo-hub') so "Report a Problem"
+        // can open the new-issue form. Leave it empty to only copy the report.
+        const REPO_URL = '';
+
+        let deviceFirmwareVersion = 'unknown';
+        let hasScanResults = false;
+        let lastScanFileCount = 0;
+        let lastLoadedFrom = 'unknown'; // which source the Amiibo list came from
+        let lastLoadedIsLocal = false;  // true when the list came from amiibo-data.json
+        let lastScanReport = null;      // details of the latest scan, used by Report a Problem
+
+        // DOM Elements
+        const connectBtn = document.getElementById('connectBtn');
+        const scanBtn = document.getElementById('scanBtn');
+        const statusBadge = document.getElementById('statusBadge');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const logConsole = document.getElementById('logConsole');
+        const clearLogsBtn = document.getElementById('clearLogsBtn');
+        const copyLogsBtn = document.getElementById('copyLogsBtn');
+        const logLines = [];
+
+        const totalAmiiboCountEl = document.getElementById('totalAmiiboCount');
+        const scannedCountEl = document.getElementById('scannedCount');
+        const missingCountEl = document.getElementById('missingCount');
+        const progressBar = document.getElementById('progressBar');
+        const progressPercent = document.getElementById('progressPercent');
+
+        const amiiboGrid = document.getElementById('amiiboGrid');
+        const emptyState = document.getElementById('emptyState');
+        const searchInput = document.getElementById('searchInput');
+        const statusFilter = document.getElementById('statusFilter');
+        const seriesFilter = document.getElementById('seriesFilter');
+
+        const reportBtn = document.getElementById('reportBtn');
+        const toastEl = document.getElementById('toast');
+        const lastScanInfo = document.getElementById('lastScanInfo');
+        const browserWarning = document.getElementById('browserWarning');
+        const browserWarningText = document.getElementById('browserWarningText');
+        const exportBtn = document.getElementById('exportBtn');
+        const exportMenu = document.getElementById('exportMenu');
+        const exportCopyBtn = document.getElementById('exportCopyBtn');
+        const exportCsvBtn = document.getElementById('exportCsvBtn');
+        document.getElementById('appVersion').textContent = 'v' + APP_VERSION;
+
+        // Check Web Bluetooth Support
+        document.getElementById('btSupport').textContent = navigator.bluetooth ? 'Yes' : 'No (Chrome/Edge required)';
+        if (!navigator.bluetooth) {
+            document.getElementById('btSupport').className = 'text-rose-400 font-bold';
+            browserWarningText.textContent = describeUnsupportedBrowser() + ' You can still browse the Amiibo list.';
+            browserWarning.classList.remove('hidden');
+            browserWarning.classList.add('flex');
+        }
+
+        function describeUnsupportedBrowser() {
+            const ua = navigator.userAgent || '';
+            const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            if (!window.isSecureContext) {
+                return 'This page has to be opened over HTTPS. Use the https:// address instead of an http:// one.';
+            }
+            if (isIOS) {
+                return "iPhones and iPads don't allow Web Bluetooth in Safari or Chrome. A Web Bluetooth browser app such as Bluefy works, or use an Android phone or a computer with Chrome or Edge.";
+            }
+            if (/Firefox\//.test(ua)) {
+                return "Firefox doesn't support Web Bluetooth. Open this page in Chrome or Edge instead.";
+            }
+            if (navigator.brave) {
+                return 'Brave turns Web Bluetooth off by default. Open brave://flags, search for "Web Bluetooth", enable it and restart Brave, or use Chrome or Edge.';
+            }
+            if (/Safari\//.test(ua) && !/Chrome\/|Chromium\/|Edg\//.test(ua)) {
+                return "Safari doesn't support Web Bluetooth. Open this page in Chrome or Edge instead.";
+            }
+            return "This browser doesn't support Web Bluetooth. Use Chrome or Edge on Android, Windows, macOS, Linux or ChromeOS.";
+        }
+
+        // ---------- small helpers: toast, clipboard, download ----------
+        let toastTimer = null;
+        function showToast(msg, ms = 3500) {
+            toastEl.textContent = msg;
+            toastEl.classList.remove('hidden');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toastEl.classList.add('hidden'), ms);
+        }
+
+        async function copyText(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (_) {}
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                return ok;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function downloadFile(filename, text, mime) {
+            const blob = new Blob([text], { type: mime });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        // ---------- Report a Problem ----------
+        function buildReport() {
+            const loaded = amiiboDatabase.filter(a => a.isLoaded).length;
+            const header = [
+                `Pixl.js Amiibo Hub v${APP_VERSION}`,
+                `Time: ${new Date().toISOString()}`,
+                `Pixl.js firmware: ${deviceFirmwareVersion}`,
+                `Browser: ${navigator.userAgent}`,
+                `Secure context: ${window.isSecureContext}`,
+                `Connected: ${isConnected}`,
+                `Amiibo list: ${amiiboDatabase.length} entries, ${hasScanResults ? loaded + ' marked as loaded' : 'no scan yet'}`,
+                `Files read in last scan: ${lastScanFileCount}`,
+                ''
+            ];
+            let details = '';
+            if (lastScanReport) {
+                const r = lastScanReport;
+                const missing = amiiboDatabase.filter(a => !a.isLoaded);
+                const lines = [
+                    '--- Scan details ---',
+                    `Files read: ${lastScanFileCount} | ID in meta: ${r.metaFiles} | ID in filename: ${r.byHexId + r.byShortId} | matched by name: ${r.byName} (${r.duplicates} extra copies) | unmatched: ${r.unmatched.length}`,
+                    '',
+                    `--- Unmatched files (${r.unmatched.length}${r.unmatched.length > 300 ? ', first 300' : ''}) ---`,
+                    ...r.unmatched.slice(0, 300),
+                    '',
+                    `--- Missing Amiibo (${missing.length}${missing.length > 200 ? ', first 200' : ''}) ---`,
+                    ...missing.slice(0, 200).map(a => `${a.name} [${a.amiiboSeries} / ${a.gameSeries}]`),
+                    '',
+                    '--- Sample of name matches ---',
+                    ...r.sample,
+                    '',
+                    ''
+                ];
+                details = lines.join('\n');
+            } else if (hasScanResults) {
+                details = 'Scan details: not available in this session (results were restored from a saved scan).\n\n';
+            }
+            return header.join('\n') + details + '--- Log ---\n' + logLines.join('\n');
+        }
+
+        // ---------- Remember the last scan (stored in this browser only) ----------
+        const LAST_SCAN_KEY = 'pixlHub.lastScan.v1';
+
+        function showLastScanInfo(rec, restored) {
+            const when = new Date(rec.time).toLocaleString();
+            const text = document.createElement('span');
+            text.textContent = restored
+                ? `Showing your last scan from ${when} (${rec.fileCount} files). Connect and press Scan to refresh. `
+                : `Last scanned ${when} (${rec.fileCount} files). Saved in this browser. `;
+            const btn = document.createElement('button');
+            btn.className = 'underline hover:text-slate-300';
+            btn.textContent = 'Forget saved scan';
+            btn.addEventListener('click', forgetLastScan);
+            lastScanInfo.replaceChildren(text, btn);
+            lastScanInfo.classList.remove('hidden');
+        }
+
+        function saveLastScan(fileCount) {
+            const rec = {
+                time: new Date().toISOString(),
+                fileCount,
+                ids: amiiboDatabase.filter(a => a.isLoaded).map(a => a.id)
+            };
+            try { localStorage.setItem(LAST_SCAN_KEY, JSON.stringify(rec)); } catch (_) {}
+            showLastScanInfo(rec, false);
+        }
+
+        function restoreLastScan() {
+            try {
+                const rec = JSON.parse(localStorage.getItem(LAST_SCAN_KEY) || 'null');
+                if (!rec || !Array.isArray(rec.ids)) return false;
+                loadedAmiiboIds = new Set(rec.ids);
+                hasScanResults = true;
+                lastScanFileCount = rec.fileCount || 0;
+                showLastScanInfo(rec, true);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function forgetLastScan() {
+            try { localStorage.removeItem(LAST_SCAN_KEY); } catch (_) {}
+            loadedAmiiboIds = new Set();
+            hasScanResults = false;
+            lastScanFileCount = 0;
+            lastScanReport = null;
+            amiiboDatabase.forEach(a => { a.isLoaded = false; });
+            scannedCountEl.textContent = 0;
+            missingCountEl.textContent = amiiboDatabase.length;
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
+            lastScanInfo.classList.add('hidden');
+            renderGrid();
+            showToast('Saved scan removed.');
+        }
+
+        // ---------- Save the Amiibo list as amiibo-data.json ----------
+        function saveAmiiboList() {
+            if (!amiiboDatabase.length) {
+                showToast('The Amiibo list is not loaded yet.');
+                return;
+            }
+            const data = {
+                savedAt: new Date().toISOString(),
+                source: lastLoadedFrom,
+                amiibo: amiiboDatabase.map(a => ({
+                    head: a.head,
+                    tail: a.tail,
+                    name: a.name,
+                    character: a.character,
+                    gameSeries: a.gameSeries,
+                    amiiboSeries: a.amiiboSeries,
+                    image: a.image
+                }))
+            };
+            downloadFile('amiibo-data.json', JSON.stringify(data), 'application/json');
+
+            const noSeries = data.amiibo.filter(a => a.gameSeries === 'Unknown Series').length;
+            let msg = `Saved ${data.amiibo.length} Amiibo. Upload amiibo-data.json next to index.html in your repository.`;
+            if (noSeries) msg += ` Note: ${noSeries} have no game series name.`;
+            showToast(msg, 8000);
+        }
+
+        // ---------- Export the missing list ----------
+        function getMissingForExport() {
+            const seriesVal = seriesFilter.value;
+            return amiiboDatabase
+                .filter(a => !a.isLoaded && (seriesVal === 'all' || a.gameSeries === seriesVal))
+                .sort((a, b) =>
+                    a.gameSeries.localeCompare(b.gameSeries) ||
+                    a.amiiboSeries.localeCompare(b.amiiboSeries) ||
+                    a.name.localeCompare(b.name));
+        }
+
+        function exportScope() {
+            return seriesFilter.value === 'all' ? 'all game series' : seriesFilter.value;
+        }
+
+        function exportReady() {
+            if (!amiiboDatabase.length) {
+                showToast('The Amiibo list is not loaded yet.');
+                return false;
+            }
+            if (!hasScanResults) {
+                showToast('Scan your Pixl.js first so the app knows what is missing.');
+                return false;
+            }
+            return true;
+        }
+
+        function csvCell(v) {
+            return '"' + String(v).replace(/"/g, '""') + '"';
+        }
+
+        function buildMissingCsv(list) {
+            const rows = [['Name', 'Amiibo Series', 'Game Series', 'ID'].map(csvCell).join(',')];
+            list.forEach(a => rows.push([a.name, a.amiiboSeries, a.gameSeries, a.id].map(csvCell).join(',')));
+            return '\uFEFF' + rows.join('\r\n');
+        }
+
+        function buildMissingText(list) {
+            const lines = [`Missing Amiibo (${list.length}) - ${new Date().toLocaleDateString()}`];
+            let current = null;
+            list.forEach(a => {
+                if (a.gameSeries !== current) {
+                    current = a.gameSeries;
+                    lines.push('', `== ${current} ==`);
+                }
+                const extra = a.amiiboSeries && a.amiiboSeries !== a.gameSeries ? ` (${a.amiiboSeries})` : '';
+                lines.push(`- ${a.name}${extra}`);
+            });
+            return lines.join('\n');
+        }
+
+        // Where the Amiibo list comes from, in order.
+        // The original AmiiboAPI shut down at the end of 2025 and now lives at amiiboapi.org.
+        // The last two entries are static copies of its data from the archived GitHub repository,
+        // which don't depend on a live server.
+        // The first entry is the local database: amiibo-data.json, kept in the same folder as this page.
+        // It can be either the archived AmiiboAPI data file or a file saved with the
+        // "Save Amiibo List" button; the format is detected automatically. It is quick and always there.
+        const AMIIBO_SOURCES = [
+            { url: './amiibo-data.json', kind: 'repo', label: 'amiibo-data.json (local database)', local: true },
+            { url: 'https://amiiboapi.org/api/amiibo/', kind: 'api' },
+            { url: 'https://www.amiiboapi.org/api/amiibo/', kind: 'api' },
+            { url: 'https://amiiboapi.com/api/amiibo/', kind: 'api' },
+            { url: 'https://cdn.jsdelivr.net/gh/N3evin/AmiiboAPI@master/database/amiibo.json', kind: 'repo' },
+            { url: 'https://raw.githubusercontent.com/N3evin/AmiiboAPI/master/database/amiibo.json', kind: 'repo' }
+        ];
+        const DB_CACHE_KEY = 'pixlHub.amiiboDb.v1';
+
+        function lowerMap(obj) {
+            const m = {};
+            Object.keys(obj || {}).forEach(k => { m[k.toLowerCase()] = obj[k]; });
+            return m;
+        }
+
+        function pickTable(db, names) {
+            for (const n of names) {
+                if (db[n] && typeof db[n] === 'object') return db[n];
+            }
+            return {};
+        }
+
+        // Turn the GitHub data file ({ amiibos: { "0x<16 hex>": {name, release} }, ...lookup tables })
+        // into the same shape the live API returns ({ amiibo: [ {head, tail, name, ...} ] }).
+        function normalizeRepoDatabase(db) {
+            if (!db || typeof db.amiibos !== 'object' || !db.amiibos) throw new Error('unexpected file format');
+
+            const characters = lowerMap(pickTable(db, ['characters', 'character']));
+            const gameSeries = lowerMap(pickTable(db, ['game_series', 'gameseries', 'gameSeries']));
+            const amiiboSeries = lowerMap(pickTable(db, ['amiibo_series', 'amiiboseries', 'amiiboSeries']));
+
+            const label = (map, key) => {
+                const v = map[key] !== undefined ? map[key] : map[key.slice(2)];
+                if (v === undefined || v === null) return '';
+                return typeof v === 'string' ? v : String(v.name || '');
+            };
+
+            const list = Object.entries(db.amiibos).map(([key, v]) => {
+                const hex = String(key).replace(/^0x/i, '').toLowerCase().padStart(16, '0');
+                const head = hex.slice(0, 8);
+                const tail = hex.slice(8);
+                const name = String((v && v.name) || 'Unknown Amiibo');
+                return {
+                    head,
+                    tail,
+                    name,
+                    character: label(characters, '0x' + hex.slice(0, 4)) || name,
+                    gameSeries: label(gameSeries, '0x' + hex.slice(0, 3)) || 'Unknown Series',
+                    amiiboSeries: label(amiiboSeries, '0x' + hex.slice(12, 14)),
+                    image: `https://raw.githubusercontent.com/N3evin/AmiiboAPI/master/images/icon_${head}-${tail}.png`
+                };
+            });
+
+            const unknown = list.filter(a => a.gameSeries === 'Unknown Series').length;
+            if (unknown) log(`Note: ${unknown} of ${list.length} Amiibo have no game series name in this data source.`);
+            return { amiibo: list };
+        }
+
+        async function getAmiiboData() {
+            for (const src of AMIIBO_SOURCES) {
+                const host = src.label || new URL(src.url).host;
+                const ctrl = new AbortController();
+                const seconds = src.kind === 'repo' ? 15 : 6;
+                const timer = setTimeout(() => ctrl.abort(), seconds * 1000);
+                try {
+                    const res = await fetch(src.url, { signal: ctrl.signal });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const raw = await res.json();
+                    const isRepoFormat = raw && typeof raw.amiibos === 'object' && raw.amiibos !== null;
+                    const data = isRepoFormat ? normalizeRepoDatabase(raw) : raw;
+                    if (!data || !Array.isArray(data.amiibo) || !data.amiibo.length) {
+                        throw new Error('unexpected response');
+                    }
+                    try { localStorage.setItem(DB_CACHE_KEY, JSON.stringify(data)); } catch (_) {}
+                    lastLoadedFrom = host;
+                    lastLoadedIsLocal = !!src.local;
+                    log(`Loaded ${data.amiibo.length} Amiibo from ${host}.`);
+                    return data;
+                } catch (err) {
+                    const reason = err.name === 'AbortError' ? `timed out after ${seconds} seconds` : err.message;
+                    log(`Amiibo list request failed (${host}): ${reason}`);
+                } finally {
+                    clearTimeout(timer);
+                }
+            }
+
+            try {
+                const cached = JSON.parse(localStorage.getItem(DB_CACHE_KEY) || 'null');
+                if (cached && Array.isArray(cached.amiibo) && cached.amiibo.length) {
+                    lastLoadedFrom = 'browser cache';
+                    lastLoadedIsLocal = false;
+                    log('Using the cached Amiibo list from your last successful load.');
+                    return cached;
+                }
+            } catch (_) {}
+
+            throw new Error('could not load the Amiibo list. Make sure amiibo-data.json is beside index.html and open the site through GitHub Pages or localhost (not by double-clicking the HTML file).');
+        }
+
+        // Fetch full Amiibo database from official AmiiboAPI
+        function toDatabaseEntry(item) {
+            const head = String(item.head || '').toLowerCase();
+            const tail = String(item.tail || '').toLowerCase();
+
+            return {
+                id: head + tail,
+                head,
+                tail,
+                name: String(item.name || item.character || 'Unknown Amiibo'),
+                character: String(item.character || ''),
+                gameSeries: String(item.gameSeries || 'Unknown Series'),
+                amiiboSeries: String(item.amiiboSeries || ''),
+                image: item.image || '',
+                isLoaded: false
+            };
+        }
+
+        // The local file is fast but frozen in time. Ask amiiboapi.org what it has and add
+        // anything the local list doesn't know yet. Existing entries are never changed, and a
+        // failure here is harmless: the local list simply stays as it is.
+        async function topUpFromLiveApi() {
+            const baseDb = amiiboDatabase;
+            const hosts = AMIIBO_SOURCES.filter(src => src.kind === 'api' && new URL(src.url).host.endsWith('amiiboapi.org'));
+
+            for (const src of hosts) {
+                const host = new URL(src.url).host;
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 8000);
+                try {
+                    const res = await fetch(src.url, { signal: ctrl.signal });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+                    if (!data || !Array.isArray(data.amiibo) || !data.amiibo.length) throw new Error('unexpected response');
+
+                    if (amiiboDatabase !== baseDb) return; // the list was reloaded meanwhile
+
+                    const known = new Set(amiiboDatabase.map(a => a.id));
+                    const fresh = data.amiibo.map(toDatabaseEntry).filter(a => a.id.length === 16 && !known.has(a.id));
+                    if (!fresh.length) {
+                        log(`Checked ${host}: nothing newer than the local list.`);
+                        return;
+                    }
+
+                    amiiboDatabase = amiiboDatabase.concat(fresh);
+                    totalAmiiboCountEl.textContent = amiiboDatabase.length;
+
+                    const keep = seriesFilter.value;
+                    populateSeriesDropdown();
+                    if (Array.from(seriesFilter.options).some(o => o.value === keep)) seriesFilter.value = keep;
+
+                    if (hasScanResults) {
+                        updateAmiiboStatus(true);
+                    } else {
+                        missingCountEl.textContent = amiiboDatabase.length;
+                        renderGrid();
+                    }
+
+                    log(`Added ${fresh.length} newer Amiibo from ${host} (${amiiboDatabase.length} in total).${hasScanResults ? ' Scan again to check them against your device.' : ''}`);
+                    return;
+                } catch (err) {
+                    const reason = err.name === 'AbortError' ? 'timed out after 8 seconds' : err.message;
+                    log(`Could not check ${host} for newer Amiibo: ${reason}`);
+                } finally {
+                    clearTimeout(timer);
+                }
+            }
+        }
+
+        let dbLoadPromise = null;
+        function fetchAmiiboDatabase() {
+            if (!dbLoadPromise) {
+                dbLoadPromise = loadAmiiboDatabase().finally(() => { dbLoadPromise = null; });
+            }
+            return dbLoadPromise;
+        }
+
+        async function loadAmiiboDatabase() {
+            log('Fetching official Amiibo Database...');
+            totalAmiiboCountEl.textContent = 'Loading...';
+            try {
+                const data = await getAmiiboData();
+
+                // Deduplicate or normalize database
+                amiiboDatabase = data.amiibo.map(toDatabaseEntry);
+
+                log(`Loaded ${amiiboDatabase.length} Amiibo entries from API.`);
+                totalAmiiboCountEl.textContent = amiiboDatabase.length;
+                missingCountEl.textContent = amiiboDatabase.length;
+
+                populateSeriesDropdown();
+                if (!hasScanResults) restoreLastScan();
+                if (hasScanResults) updateAmiiboStatus(true); else renderGrid();
+
+                if (lastLoadedIsLocal) topUpFromLiveApi().catch(() => {});
+            } catch (err) {
+                log(`Error loading database: ${err.message}. Check your connection, then press Reload List.`);
+                totalAmiiboCountEl.textContent = 'Error';
+                amiiboDatabase = [];
+                populateSeriesDropdown();
+                renderGrid();
+            }
+        }
+
+        // Populate Series Filter dropdown menu
+        function populateSeriesDropdown() {
+            const seriesSet = new Set(amiiboDatabase.map(a => a.gameSeries).filter(Boolean));
+            const sortedSeries = Array.from(seriesSet).sort();
+
+            seriesFilter.innerHTML = '<option value="all">All Game Series</option>';
+            sortedSeries.forEach(series => {
+                if (series) {
+                    const option = document.createElement('option');
+                    option.value = series;
+                    option.textContent = series;
+                    seriesFilter.appendChild(option);
+                }
+            });
+        }
+
+        // Connect to Pixl.js via Web Bluetooth
+        async function connectPixl() {
+            if (isConnected) {
+                disconnectPixl();
+                return;
+            }
+
+            if (!navigator.bluetooth) {
+                log('Web Bluetooth is not supported in this browser.');
+                showToast('This browser does not support Web Bluetooth - see the notice at the top of the page.', 5000);
+                browserWarning.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+
+            try {
+                log('Requesting Bluetooth Device...');
+
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [
+                        { namePrefix: 'Pixl.js' },
+                        { namePrefix: 'Puck.js' },
+                        { namePrefix: 'Espruino' },
+                        { services: [NORDIC_UART_SERVICE] }
+                    ],
+                    optionalServices: [NORDIC_UART_SERVICE]
+                });
+
+                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+                log(`Connecting to ${bluetoothDevice.name || 'Bluetooth device'}...`);
+                gattServer = await bluetoothDevice.gatt.connect();
+
+                log('Getting Nordic UART Service...');
+                const service = await gattServer.getPrimaryService(NORDIC_UART_SERVICE);
+
+                // Nordic UART Service:
+                // 6e400002 = command input (write TO Pixl.js)
+                // 6e400003 = console output (notify FROM Pixl.js)
+                txCharacteristic = await service.getCharacteristic(NORDIC_UART_TX);
+                rxCharacteristic = await service.getCharacteristic(NORDIC_UART_RX);
+
+                log('Starting device notifications...');
+                await rxCharacteristic.startNotifications();
+                rxCharacteristic.addEventListener('characteristicvaluechanged', handleRxData);
+
+                updateConnectionState(true, bluetoothDevice.name || 'Pixl.js');
+                log(`Connected successfully to ${bluetoothDevice.name || 'Pixl.js'}.`);
+
+                // Sanity check: ask the firmware for its version over the binary protocol.
+                try {
+                    const res = await request(CMD.VERSION, undefined, 4000);
+                    if (res.status === 0 && res.data.length >= 2) {
+                        const len = res.data[0] | (res.data[1] << 8);
+                        const ver = new TextDecoder().decode(res.data.subarray(2, 2 + len));
+                        deviceFirmwareVersion = ver;
+                        log(`Pixl.js firmware reports version ${ver}.`);
+                    } else {
+                        log(`Version request returned status ${res.status}.`);
+                    }
+                } catch (e) {
+                    log(`Device did not answer the Pixl.js file-transfer protocol (${e.message}). Is another app connected to it?`);
+                }
+
+            } catch (err) {
+                log(`Bluetooth Connection Failed: ${err.message}`);
+                cleanupBluetooth();
+                updateConnectionState(false);
+            }
+        }
+
+        // Update badge, buttons and connection flag
+        function updateConnectionState(connected, name = '') {
+            isConnected = connected;
+            statusText.textContent = connected ? `Connected: ${name}` : 'Disconnected';
+            statusDot.className = `w-2.5 h-2.5 rounded-full ${connected ? 'bg-emerald-400' : 'bg-slate-500'}`;
+            statusBadge.className = connected
+                ? 'px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-900/40 text-emerald-300 border border-emerald-700 flex items-center gap-2'
+                : 'px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-700 text-slate-300 border border-slate-600 flex items-center gap-2';
+            connectBtn.querySelector('span').textContent = connected ? 'Disconnect' : 'Connect Pixl.js';
+            scanBtn.disabled = !connected || isScanning;
+        }
+
+        function cleanupBluetooth() {
+            if (scanTimeout) {
+                clearTimeout(scanTimeout);
+                scanTimeout = null;
+            }
+
+            isScanning = false;
+
+            if (pending) {
+                clearTimeout(pending.timer);
+                pending.reject(new Error('Disconnected'));
+                pending = null;
+            }
+
+            if (rxCharacteristic) {
+                try {
+                    rxCharacteristic.removeEventListener('characteristicvaluechanged', handleRxData);
+                } catch (_) {}
+            }
+
+            txCharacteristic = null;
+            rxCharacteristic = null;
+            gattServer = null;
+        }
+
+        function disconnectPixl() {
+            try {
+                // Avoid onDisconnected firing a second time (duplicate log/cleanup)
+                if (bluetoothDevice) {
+                    bluetoothDevice.removeEventListener('gattserverdisconnected', onDisconnected);
+                }
+                if (gattServer && gattServer.connected) {
+                    gattServer.disconnect();
+                }
+            } catch (err) {
+                log(`Disconnect warning: ${err.message}`);
+            }
+
+            cleanupBluetooth();
+            updateConnectionState(false);
+            log('Pixl.js Device Disconnected.');
+        }
+
+        function onDisconnected() {
+            cleanupBluetooth();
+            updateConnectionState(false);
+            log('Pixl.js Device Disconnected.');
+        }
+
+        // ------------------------------------------------------------------
+        // Pixl.js BLE file-transfer protocol (solosky firmware, binary)
+        // Packet: cmd (u8) | status (u8) | chunk (u16 LE) | data...
+        // Chunk high bit (0x8000) set = more packets follow.
+        // ------------------------------------------------------------------
+        const CMD = { VERSION: 0x01, DISKS: 0x10, READ_FOLDER: 0x16 };
+
+        function buildPacket(cmd, payload = new Uint8Array(0)) {
+            const buf = new Uint8Array(4 + payload.length); // status = 0, chunk = 0
+            buf[0] = cmd;
+            buf.set(payload, 4);
+            return buf;
+        }
+
+        // Paths are sent as: length (u16 LE) + UTF-8 bytes
+        function encodePath(path) {
+            const bytes = new TextEncoder().encode(path);
+            const out = new Uint8Array(2 + bytes.length);
+            new DataView(out.buffer).setUint16(0, bytes.length, true);
+            out.set(bytes, 2);
+            return out;
+        }
+
+        function concatBytes(parts) {
+            const out = new Uint8Array(parts.reduce((n, a) => n + a.length, 0));
+            let o = 0;
+            parts.forEach(a => { out.set(a, o); o += a.length; });
+            return out;
+        }
+
+        // The firmware treats each GATT write as one whole packet, so never split a packet.
+        async function sendPacket(bytes) {
+            if (!txCharacteristic) {
+                throw new Error('Bluetooth write characteristic is not available.');
+            }
+            try {
+                if (txCharacteristic.writeValueWithResponse) {
+                    await txCharacteristic.writeValueWithResponse(bytes);
+                } else {
+                    await txCharacteristic.writeValue(bytes);
+                }
+            } catch (err) {
+                log(`Bluetooth write failed: ${err.message}`);
+                throw err;
+            }
+        }
+
+        // Send one request and resolve with { status, data } once the reply is complete.
+        function request(cmd, payload = new Uint8Array(0), timeoutMs = REQUEST_TIMEOUT_MS) {
+            const run = () => new Promise((resolve, reject) => {
+                const req = { cmd, parts: [], resolve, reject, timeoutMs, timer: null };
+
+                req.onTimeout = () => {
+                    if (pending === req) pending = null;
+                    reject(new Error(`timeout waiting for reply to command 0x${cmd.toString(16)} (${req.parts.length} packets received)`));
+                };
+
+                req.timer = setTimeout(req.onTimeout, timeoutMs);
+                pending = req;
+
+                sendPacket(buildPacket(cmd, payload)).catch(err => {
+                    clearTimeout(req.timer);
+                    if (pending === req) pending = null;
+                    reject(err);
+                });
+            });
+
+            const result = requestQueue.then(run, run);
+            requestQueue = result.catch(() => {});
+            return result;
+        }
+
+        // Handle notifications from the device
+        function handleRxData(event) {
+            const dv = event.target.value;
+            const bytes = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+            if (bytes.length < 4) return;
+
+            const cmd = bytes[0];
+            const status = bytes[1];
+            const chunk = bytes[2] | (bytes[3] << 8);
+            console.debug('[Pixl.js Hub] rx', { cmd, status, chunk, len: bytes.length });
+
+            if (!pending || pending.cmd !== cmd) {
+                log(`Ignoring unexpected packet (cmd 0x${cmd.toString(16)}, ${bytes.length} bytes).`);
+                return;
+            }
+
+            if (status !== 0) {
+                const req = pending;
+                pending = null;
+                clearTimeout(req.timer);
+                req.resolve({ status, data: new Uint8Array(0) });
+                return;
+            }
+
+            pending.parts.push(bytes.slice(4));
+
+            if (chunk & 0x8000) {
+                // More packets are coming: restart the silence timer
+                clearTimeout(pending.timer);
+                pending.timer = setTimeout(pending.onTimeout, pending.timeoutMs);
+                return;
+            }
+
+            const req = pending;
+            pending = null;
+            clearTimeout(req.timer);
+            req.resolve({ status: 0, data: concatBytes(req.parts) });
+        }
+
+        // 0x10 reply: count (u8), then per drive: status (u8), label (char),
+        // name length (u16) + name, total size (u32), used size (u32)
+        function parseDisks(data) {
+            const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+            const disks = [];
+            if (data.length < 1) return disks;
+            const count = dv.getUint8(0);
+            let p = 1;
+            for (let i = 0; i < count && p + 4 <= data.length; i++) {
+                const status = dv.getUint8(p++);
+                const label = String.fromCharCode(dv.getUint8(p++));
+                const nameLen = dv.getUint16(p, true);
+                p += 2 + nameLen + 8;
+                disks.push({ status, label });
+            }
+            return disks;
+        }
+
+        // 0x16 reply: repeated entries of
+        // name length (u16) + name, size (u32), type (u8: 0 file, 1 folder), meta length (u8) + meta
+        function parseFolder(data) {
+            const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+            const dec = new TextDecoder();
+            const entries = [];
+            let p = 0;
+            while (p + 2 <= data.length) {
+                const nameLen = dv.getUint16(p, true);
+                p += 2;
+                if (p + nameLen + 6 > data.length) break;
+                const name = dec.decode(data.subarray(p, p + nameLen));
+                p += nameLen;
+                const size = dv.getUint32(p, true);
+                p += 4;
+                const type = dv.getUint8(p++);
+                const metaLen = dv.getUint8(p++);
+                if (p + metaLen > data.length) break;
+                const meta = data.subarray(p, p + metaLen);
+                p += metaLen;
+                entries.push({ name, size, isDir: type === 1, meta });
+            }
+            return entries;
+        }
+
+        function hexOf(bytes, max = 32) {
+            const arr = Array.from(bytes.subarray(0, max), b => b.toString(16).padStart(2, '0'));
+            return arr.join(' ') + (bytes.length > max ? ' ...' : '');
+        }
+
+        function hex32(n) {
+            return (n >>> 0).toString(16).padStart(8, '0');
+        }
+
+        // File meta: size (u8), then entries of type (u8) + data.
+        // Type 1 = note (len + bytes), type 2 = flags (1 byte), type 3 = amiibo head (u32) + tail (u32).
+        // Returns candidate hex IDs (both byte orders, to be safe) or null if there is no amiibo meta.
+        function parseAmiiboMeta(meta) {
+            if (!meta || meta.length < 9) return null;
+            for (const start of [1, 0]) { // meta may or may not include the leading size byte
+                let p = start;
+                while (p < meta.length) {
+                    const type = meta[p++];
+                    if (type === 1) {
+                        if (p >= meta.length) break;
+                        p += 1 + meta[p];
+                    } else if (type === 2) {
+                        p += 1;
+                    } else if (type === 3) {
+                        if (p + 8 > meta.length) break;
+                        const dv = new DataView(meta.buffer, meta.byteOffset + p, 8);
+                        const le = { head: hex32(dv.getUint32(0, true)), tail: hex32(dv.getUint32(4, true)) };
+                        const be = { head: hex32(dv.getUint32(0, false)), tail: hex32(dv.getUint32(4, false)) };
+                        return [le.head + le.tail, be.head + be.tail, le.tail, be.tail];
+                    } else {
+                        break;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function finishScan() {
+            isScanning = false;
+
+            if (scanTimeout) {
+                clearTimeout(scanTimeout);
+                scanTimeout = null;
+            }
+
+            scanBtn.disabled = !isConnected;
+            scanBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass font-bold"></i><span>Scan Pixl.js Device</span>';
+        }
+
+        // Walk the device's storage over BLE and collect Amiibo files.
+        async function scanPixlDevice() {
+            if (!isConnected || !txCharacteristic || isScanning) return;
+
+            isScanning = true;
+            scanBtn.disabled = true;
+            scanBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Scanning...</span>';
+            log('Scanning Pixl.js storage for Amiibo files...');
+
+            const MAX_DEPTH = 5; // follow subfolders up to 5 levels below E:/amiibo; a folder with no subfolders ends that branch
+            const names = [];          // files with no amiibo ID in their meta (matched by filename)
+            const metaIds = new Set(); // IDs read straight from file meta
+            let fileCount = 0;
+            let folderCount = 0;
+            let sampled = 0;
+            let readOk = false; // at least one folder was read successfully
+            const SKIPPED = -1; // returned by walk() for a folder that could not be read
+            const skipped = [];
+            const tooDeep = []; // folders left unscanned because they are nested deeper than MAX_DEPTH
+
+            if (!amiiboDatabase.length) {
+                log('Amiibo list is empty - trying to load it again before scanning...');
+                await fetchAmiiboDatabase();
+                if (!amiiboDatabase.length) {
+                    log('The Amiibo list still could not be loaded, so nothing can be marked. Check your internet connection, then press Reload List.');
+                    finishScan();
+                    return;
+                }
+            }
+
+            // Returns the status code of the folder read (0 = OK)
+            async function walk(path, depth) {
+                const verbose = ++folderCount <= 15; // keep the log readable on big trees
+                if (verbose) log(`Reading ${path} ...`);
+                scanBtn.querySelector('span').textContent = `Scanning... ${folderCount} folders, ${fileCount} files`;
+
+                let res;
+                try {
+                    try {
+                        res = await request(CMD.READ_FOLDER, encodePath(path));
+                    } catch (err) {
+                        if (!isConnected) throw err;
+                        log(`  ${path}: ${err.message} - retrying once...`);
+                        // Pause so any late packets from the failed attempt arrive and get ignored
+                        await new Promise(r => setTimeout(r, FOLDER_RETRY_PAUSE_MS));
+                        res = await request(CMD.READ_FOLDER, encodePath(path), FOLDER_RETRY_TIMEOUT_MS);
+                    }
+                } catch (err) {
+                    if (!isConnected) throw err;
+                    skipped.push(path);
+                    log(`  Skipped ${path}: ${err.message}`);
+                    return SKIPPED;
+                }
+
+                if (res.status !== 0) {
+                    log(`  ${path}: device returned status 0x${res.status.toString(16)}`);
+                    return res.status;
+                }
+
+                readOk = true;
+                const entries = parseFolder(res.data);
+                if (verbose) log(`  ${path}: ${entries.length} entries (${res.data.length} bytes)`);
+                if (entries.length === 0 && res.data.length > 0) log(`  unparsed reply: ${hexOf(res.data, 48)}`);
+
+                for (const e of entries) {
+                    const full = path.replace(/\/$/, '') + '/' + e.name;
+                    if (e.isDir) {
+                        if (depth < MAX_DEPTH) await walk(full, depth + 1);
+                        else tooDeep.push(full);
+                    } else if (/\.bin$/i.test(e.name)) {
+                        fileCount++;
+                        if (sampled < 3) {
+                            sampled++;
+                            log(`  sample file: ${e.name}  meta: ${e.meta.length ? hexOf(e.meta, 24) : '(none)'}`);
+                        }
+                        const ids = parseAmiiboMeta(e.meta);
+                        if (ids) ids.forEach(id => metaIds.add(id));
+                        else names.push({ name: e.name, path: full });
+                    }
+                }
+                return 0;
+            }
+
+            try {
+                const disksRes = await request(CMD.DISKS);
+                const disks = disksRes.status === 0 ? parseDisks(disksRes.data).filter(d => d.status === 0) : [];
+                const labels = disks.length ? disks.map(d => d.label) : ['E'];
+                log(`Drives available: ${labels.join(', ')}`);
+
+                for (const label of labels) {
+                    let st = await walk(`${label}:/amiibo`, 0);
+                    if (st !== 0 && st !== SKIPPED) st = await walk(`${label}:/`, 0); // no amiibo folder: scan the drive root
+                    if (st !== 0 && st !== SKIPPED) log(`Drive ${label}: could not be read (status 0x${st.toString(16)}).`);
+                }
+
+                log(`Read ${fileCount} .bin files (${fileCount - names.length} with Amiibo IDs in their meta).`);
+                if (tooDeep.length) {
+                    log(`Warning: ${tooDeep.length} folder(s) are nested more than ${MAX_DEPTH} levels deep and were not scanned: ${tooDeep.slice(0, 3).join(', ')}${tooDeep.length > 3 ? ', ...' : ''}`);
+                    showToast(`${tooDeep.length} folder(s) are nested too deeply and were not scanned - see the log.`, 7000);
+                }
+                if (skipped.length) {
+                    log(`Warning: ${skipped.length} folder(s) could not be read, so the results may be incomplete: ${skipped.slice(0, 5).join(', ')}${skipped.length > 5 ? ', ...' : ''}`);
+                    showToast(`${skipped.length} folder(s) could not be read - results may be incomplete. Try scanning again.`, 7000);
+                }
+                if (!readOk) {
+                    log('Could not read any folder on the device, so the scan result was not applied.');
+                    showToast('Scan failed - see the log. Use Report a Problem if it keeps happening.', 5000);
+                } else {
+                    if (fileCount === 0) log('No .bin files were found. If you expected some, use Report a Problem and send the report to the developer.');
+                    if (metaIds.size) log(`Sample IDs from device: ${[...metaIds].slice(0, 4).join(', ')}`);
+                    processScannedFiles(names, metaIds, { metaFiles: fileCount - names.length });
+                    lastScanFileCount = fileCount;
+                    saveLastScan(fileCount);
+                }
+            } catch (err) {
+                log(`Scan failed: ${err.message}`);
+            } finally {
+                finishScan();
+            }
+        }
+
+        // Normalize a filename for safe comparisons.
+        function normalizeName(value) {
+            return String(value || '')
+                .toLowerCase()
+                .replace(/\.bin$/i, '')
+                .replace(/[^a-z0-9]/g, '');
+        }
+
+        function normalizeHex(value) {
+            return String(value || '').toLowerCase().replace(/[^0-9a-f]/g, '');
+        }
+
+        // Process file list detected on Pixl.js device.
+        // fileList holds the files that had no Amiibo ID in their meta, as { name, path }.
+        function processScannedFiles(fileList, metaIds = [], info = {}) {
+            finishScan();
+
+            const files = fileList
+                .map(f => (typeof f === 'string' ? { name: f, path: f } : f))
+                .filter(f => f && typeof f.name === 'string' && f.name.trim())
+                .map(f => ({ name: f.name.trim(), path: String(f.path || f.name) }));
+            loadedFilenames = files.map(f => f.name);
+
+            log(`Found ${files.length} files on Pixl.js device.`);
+            loadedAmiiboIds.clear();
+            metaIds.forEach(id => loadedAmiiboIds.add(id));
+
+            const r = {
+                metaFiles: info.metaFiles || 0,
+                byHexId: 0,
+                byShortId: 0,
+                byName: 0,
+                duplicates: 0,
+                unmatched: [],
+                claims: {},
+                sample: []
+            };
+            const needName = [];
+
+            files.forEach(({ name, path }) => {
+                const cleanName = name.toLowerCase();
+                const rel = path.replace(/^[A-Za-z]:\/amiibo\//i, '');
+
+                // First look for a full 16-character Amiibo ID.
+                // This avoids accidentally accepting short random hex values.
+                const hexMatches = cleanName.match(/[0-9a-f]{16}/g);
+                if (hexMatches && hexMatches.length) {
+                    hexMatches.forEach(id => loadedAmiiboIds.add(normalizeHex(id)));
+                    r.byHexId++;
+                    return;
+                }
+
+                // Also accept an 8-character tail/head ID when that is how
+                // the user's files are named.
+                const shortMatches = cleanName.match(/(?:^|[^0-9a-f])([0-9a-f]{8})(?:[^0-9a-f]|$)/g);
+                if (shortMatches) {
+                    shortMatches.forEach(match => {
+                        const id = match.match(/[0-9a-f]{8}/);
+                        if (id) loadedAmiiboIds.add(id[0].toLowerCase());
+                    });
+                    r.byShortId++;
+                    return;
+                }
+
+                needName.push({ name, rel });
+            });
+
+            // Match the rest by Amiibo name. Many Amiibo share a name (several "Isabelle", "Ken", ...),
+            // so each Amiibo can be claimed by one file: a second "isabelle" file claims the next
+            // Isabelle. The folder path (e.g. an "Animal Crossing" folder) decides which one is
+            // preferred, and files with a clear series hint pick first.
+            const db = amiiboDatabase.map(a => ({
+                a,
+                n: normalizeName(a.name),
+                series: normalizeName(a.amiiboSeries),
+                game: normalizeName(a.gameSeries)
+            }));
+            const taken = new Set();
+
+            const jobs = needName.map(({ name, rel }) => {
+                const nf = normalizeName(name);
+                const dir = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '';
+                const context = normalizeName(dir) + nf;
+
+                // The longest Amiibo name found inside the filename wins; entries with that same name tie.
+                let group = [];
+                let bestLen = 0;
+                db.forEach(e => {
+                    if (!e.n || !nf.includes(e.n)) return;
+                    if (e.n.length > bestLen) { bestLen = e.n.length; group = [e]; }
+                    else if (e.n.length === bestLen) group.push(e);
+                });
+
+                const affinity = e => (e.series && context.includes(e.series) ? 2 : 0) + (e.game && context.includes(e.game) ? 1 : 0);
+                const ranked = group
+                    .map((e, i) => ({ e, s: affinity(e), i }))
+                    .sort((x, y) => y.s - x.s || x.i - y.i);
+                return { rel, ranked, top: ranked.length ? ranked[0].s : -1 };
+            });
+
+            jobs.sort((x, y) => y.top - x.top);
+
+            jobs.forEach(job => {
+                if (!job.ranked.length) {
+                    r.unmatched.push(job.rel);
+                    return;
+                }
+                const free = job.ranked.find(c => !taken.has(c.e.a.id));
+                const pick = free || job.ranked[0];
+                if (!free) r.duplicates++; // more files with this name than Amiibo entries
+
+                taken.add(pick.e.a.id);
+                loadedAmiiboIds.add(normalizeHex(pick.e.a.id));
+                (r.claims[pick.e.a.id] = r.claims[pick.e.a.id] || []).push(job.rel);
+                if (r.byName % 30 === 0 && r.sample.length < 40) {
+                    r.sample.push(`${job.rel} => ${pick.e.a.name} [${pick.e.a.amiiboSeries}]`);
+                }
+                r.byName++;
+            });
+
+            r.unmatched.sort();
+            lastScanReport = r;
+            log(`Matching: ${r.byHexId + r.byShortId} by ID in filename, ${r.byName} by name (${r.duplicates} were extra copies), ${r.unmatched.length} unmatched.`);
+
+            updateAmiiboStatus();
+        }
+
+        // Compare loaded Amiibo against Database
+        function updateAmiiboStatus(quiet = false) {
+            let loadedCount = 0;
+            hasScanResults = true;
+
+            amiiboDatabase.forEach(amiibo => {
+                const fullId = normalizeHex(amiibo.id);
+                const tail = normalizeHex(amiibo.tail);
+
+                // Don't match on `head` alone: it is shared by every variant of a character.
+                const isLoaded =
+                    loadedAmiiboIds.has(fullId) ||
+                    loadedAmiiboIds.has(tail);
+
+                amiibo.isLoaded = isLoaded;
+                if (isLoaded) loadedCount++;
+            });
+
+            const total = amiiboDatabase.length;
+            const missing = Math.max(0, total - loadedCount);
+            const percentage = total > 0
+                ? Math.round((loadedCount / total) * 100)
+                : 0;
+
+            scannedCountEl.textContent = loadedCount;
+            missingCountEl.textContent = missing;
+            progressBar.style.width = `${percentage}%`;
+            progressPercent.textContent = `${percentage}%`;
+
+            if (!quiet) log(`Scan Complete: ${loadedCount} loaded, ${missing} missing.`);
+            renderGrid();
+        }
+
+        // Render Amiibo Cards based on Filter & Search
+        function renderGrid() {
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            const statusVal = statusFilter.value;
+            const seriesVal = seriesFilter.value;
+
+            const filtered = amiiboDatabase.filter(amiibo => {
+                // Search match
+                const matchesSearch = (amiibo.name || '').toLowerCase().includes(searchTerm) ||
+                                      (amiibo.character || '').toLowerCase().includes(searchTerm) ||
+                                      (amiibo.gameSeries || '').toLowerCase().includes(searchTerm) ||
+                                      (amiibo.amiiboSeries || '').toLowerCase().includes(searchTerm) ||
+                                      amiibo.id.includes(searchTerm);
+
+                // Status match
+                const matchesStatus = (statusVal === 'all') ||
+                                      (statusVal === 'loaded' && amiibo.isLoaded) ||
+                                      (statusVal === 'missing' && !amiibo.isLoaded);
+
+                // Series match
+                const matchesSeries = (seriesVal === 'all') || (amiibo.gameSeries === seriesVal);
+
+                return matchesSearch && matchesStatus && matchesSeries;
+            });
+
+            if (filtered.length === 0) {
+                const listMissing = amiiboDatabase.length === 0;
+                document.getElementById('emptyTitle').textContent = listMissing
+                    ? "The Amiibo list isn't loaded."
+                    : 'No Amiibo match your search query.';
+                document.getElementById('emptyHint').textContent = listMissing
+                    ? 'Check your internet connection, then press Reload List.'
+                    : 'Try resetting filters or searching for another character.';
+                amiiboGrid.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            emptyState.classList.remove('flex');
+
+            amiiboGrid.innerHTML = filtered.map(amiibo => `
+                <div class="bg-slate-800/80 border ${amiibo.isLoaded ? 'border-emerald-500/50 bg-emerald-950/10' : 'border-slate-700/60'} rounded-xl p-3 flex flex-col justify-between hover:border-indigo-500/50 transition-all group relative overflow-hidden">
+
+                    <!-- Status Badge Tag -->
+                    <div class="absolute top-2 right-2 z-10">
+                        ${amiibo.isLoaded ? 
+                            `<span class="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
+                                <i class="fa-solid fa-check text-[9px]"></i> Loaded
+                             </span>` : 
+                            `<span class="bg-slate-700/50 text-slate-400 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-slate-600/40">
+                                Missing
+                             </span>`
+                        }
+                    </div>
+
+                    <!-- Amiibo Image Container -->
+                    <div class="w-full h-36 flex items-center justify-center p-2 my-2 relative">
+                        <img src="${amiibo.image || 'https://placehold.co/120x150/1e293b/94a3b8?text=Amiibo'}" alt="${amiibo.name}" loading="lazy"
+                             class="max-h-full object-contain filter ${amiibo.isLoaded ? 'drop-shadow-[0_4px_10px_rgba(16,185,129,0.3)]' : 'grayscale opacity-60'} group-hover:scale-105 transition-transform duration-300"
+                             onerror="this.onerror=null;this.src='https://placehold.co/120x150/1e293b/94a3b8?text=Amiibo'">
+                    </div>
+
+                    <!-- Details Footer -->
+                    <div class="mt-2 border-t border-slate-700/50 pt-2">
+                        <h4 class="text-xs font-bold text-slate-100 truncate" title="${amiibo.name}">${amiibo.name}</h4>
+                        <p class="text-[11px] text-slate-400 truncate">${amiibo.gameSeries}</p>
+                        <p class="text-[9px] font-mono text-slate-500 mt-1 uppercase">ID: ${amiibo.tail}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Logging function
+        function log(msg) {
+            console.log(`[Pixl.js Hub] ${msg}`);
+            logLines.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+            if (logLines.length > 300) logLines.shift();
+            logConsole.textContent = logLines.join('\n');
+            logConsole.scrollTop = logConsole.scrollHeight;
+        }
+
+        // Event Listeners
+        connectBtn.addEventListener('click', connectPixl);
+        scanBtn.addEventListener('click', scanPixlDevice);
+        document.getElementById('reloadDbBtn').addEventListener('click', fetchAmiiboDatabase);
+        document.getElementById('saveListBtn').addEventListener('click', saveAmiiboList);
+
+        reportBtn.addEventListener('click', async () => {
+            const ok = await copyText(buildReport()); // copy first: opening a new tab can steal focus
+            if (REPO_URL) {
+                const base = REPO_URL.replace(/\/$/, '');
+                const body = 'What went wrong?\n\n(Paste the copied report below this line.)\n';
+                window.open(`${base}/issues/new?title=${encodeURIComponent('Problem report')}&body=${encodeURIComponent(body)}`, '_blank', 'noopener');
+            }
+            const note = 'It includes the file names found on your device.';
+            if (!ok) {
+                showToast('Could not copy automatically - use Copy Log and paste it into your report.', 6000);
+            } else if (REPO_URL) {
+                showToast(`Report copied - paste it into the new issue. ${note}`, 7000);
+            } else {
+                showToast(`Report copied. ${note}`, 6000);
+            }
+        });
+
+        exportBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const opening = exportMenu.classList.contains('hidden');
+            exportMenu.classList.toggle('hidden', !opening);
+            if (opening) {
+                const r = exportBtn.getBoundingClientRect();
+                const fitsRight = r.left + 176 <= window.innerWidth - 8;
+                exportMenu.classList.toggle('left-0', fitsRight);
+                exportMenu.classList.toggle('right-0', !fitsRight);
+            }
+        });
+        document.addEventListener('click', () => exportMenu.classList.add('hidden'));
+
+        exportCopyBtn.addEventListener('click', async () => {
+            if (!exportReady()) return;
+            const list = getMissingForExport();
+            if (!list.length) { showToast('Nothing missing in this series.'); return; }
+            const ok = await copyText(buildMissingText(list));
+            showToast(ok ? `Copied ${list.length} missing Amiibo (${exportScope()}).` : 'Could not copy - try Download CSV instead.');
+        });
+
+        exportCsvBtn.addEventListener('click', () => {
+            if (!exportReady()) return;
+            const list = getMissingForExport();
+            if (!list.length) { showToast('Nothing missing in this series.'); return; }
+            downloadFile(`missing-amiibo-${new Date().toISOString().slice(0, 10)}.csv`, buildMissingCsv(list), 'text/csv;charset=utf-8');
+            showToast(`Downloaded ${list.length} missing Amiibo (${exportScope()}).`);
+        });
+
+        searchInput.addEventListener('input', renderGrid);
+        statusFilter.addEventListener('change', renderGrid);
+        seriesFilter.addEventListener('change', renderGrid);
+
+        clearLogsBtn.addEventListener('click', () => {
+            logLines.length = 0;
+            logConsole.textContent = 'Logs cleared.';
+        });
+
+        copyLogsBtn.addEventListener('click', async () => {
+            const ok = await copyText(logLines.join('\n'));
+            showToast(ok ? 'Log copied.' : 'Could not copy - select the log text instead.');
+        });
+
+        // Initialize on Load
+        window.addEventListener('DOMContentLoaded', () => {
+            if (navigator.bluetooth && !window.isSecureContext) {
+                log('Web Bluetooth requires HTTPS or localhost.');
+            }
+
+            fetchAmiiboDatabase();
+        });
+    </script>
+</body>
+</html>
